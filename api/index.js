@@ -196,6 +196,17 @@ app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
   return res.status(401).json({ error: 'Invalid username or password.' });
 });
 
+// --- GET ADMIN ME ---
+app.get(['/api/admin/me', '/admin/me'], authMiddleware, (req, res) => {
+  res.json({
+    admin: {
+      id: req.admin.id || 'owner_admin_1',
+      username: req.admin.username || 'admin',
+      name: 'Aarav Sharma'
+    }
+  });
+});
+
 // --- ADMIN STORIES ---
 app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
   const dbOk = await connectDB();
