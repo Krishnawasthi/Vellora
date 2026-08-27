@@ -130,9 +130,10 @@ app.all(['/', '/api/health', '/health'], async (req, res) => {
   });
 });
 
-// --- PUBLIC STORIES ---
+// --- PUBLIC STORIES (DUAL-MERGE PERSISTENCE) ---
 app.get(['/api/stories', '/stories'], async (req, res) => {
   const dbOk = await connectDB();
+  let dbStories = [];
   if (dbOk) {
     try {
       const { category, search, language } = req.query;
@@ -145,13 +146,26 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
           { excerpt: { $regex: search, $options: 'i' } }
         ];
       }
-      const stories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1, publishedAt: -1 });
-      return res.json({ stories });
+      dbStories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1, publishedAt: -1 });
     } catch (err) {
       console.error('DB fetch error:', err.message);
     }
   }
-  return res.json({ stories: memoryStories });
+
+  // Combine MongoDB Atlas stories and memory stories
+  const combinedMap = new Map();
+  dbStories.forEach(s => {
+    const obj = s.toObject ? s.toObject() : s;
+    combinedMap.set(String(obj.slug), obj);
+  });
+  memoryStories.forEach(s => {
+    if (!combinedMap.has(String(s.slug)) && s.status !== 'PRIVATE') {
+      combinedMap.set(String(s.slug), s);
+    }
+  });
+
+  const stories = Array.from(combinedMap.values());
+  return res.json({ stories });
 });
 
 // --- SINGLE STORY DETAIL ---
@@ -160,7 +174,7 @@ app.get(['/api/stories/:slug', '/stories/:slug'], async (req, res) => {
   if (dbOk) {
     try {
       const story = await Story.findOne({ slug: req.params.slug });
-      if (story) return res.json(story);
+      if (story) return res.json(story.toObject ? story.toObject() : story);
     } catch (err) {
       console.error('DB findOne error:', err.message);
     }
@@ -218,9 +232,12 @@ app.get(['/api/admin/me', '/admin/me'], authMiddleware, (req, res) => {
   });
 });
 
-// --- GET ALL ADMIN STORIES ---
+// --- GET ALL ADMIN STORIES (DUAL-MERGE PERSISTENCE) ---
 app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
   const dbOk = await connectDB();
+  let dbStories = [];
+  let total = 0, published = 0, drafts = 0, privateCount = 0;
+
   if (dbOk) {
     try {
       const { status, search } = req.query;
@@ -232,18 +249,31 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
           { excerpt: { $regex: search, $options: 'i' } }
         ];
       }
-      const stories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1 });
-      const total = await Story.countDocuments();
-      const published = await Story.countDocuments({ status: { $ne: 'PRIVATE' } });
-      const drafts = await Story.countDocuments({ status: 'DRAFT' });
-      const privateCount = await Story.countDocuments({ status: 'PRIVATE' });
-      
-      return res.json({ stories, stats: { total, published, drafts, private: privateCount } });
+      dbStories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1 });
     } catch (err) {
       console.error('Admin stories error:', err.message);
     }
   }
-  return res.json({ stories: memoryStories, stats: { total: memoryStories.length, published: memoryStories.length, drafts: 0, private: 0 } });
+
+  // Combine MongoDB Atlas stories and memory stories
+  const combinedMap = new Map();
+  dbStories.forEach(s => {
+    const obj = s.toObject ? s.toObject() : s;
+    combinedMap.set(String(obj.slug), obj);
+  });
+  memoryStories.forEach(s => {
+    if (!combinedMap.has(String(s.slug))) {
+      combinedMap.set(String(s.slug), s);
+    }
+  });
+
+  const stories = Array.from(combinedMap.values());
+  total = stories.length;
+  published = stories.filter(s => s.status !== 'PRIVATE').length;
+  drafts = stories.filter(s => s.status === 'DRAFT').length;
+  privateCount = stories.filter(s => s.status === 'PRIVATE').length;
+
+  return res.json({ stories, stats: { total, published, drafts, private: privateCount } });
 });
 
 // --- CREATE NEW STORY (POST) ---
@@ -273,21 +303,22 @@ app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, r
     updatedAt: now
   };
 
+  // Always keep in memoryStories array as a secondary live store
+  storyData._id = `mem_${Date.now()}`;
+  memoryStories.unshift(storyData);
+
   const dbOk = await connectDB();
   if (dbOk) {
     try {
       const created = await Story.create(storyData);
-      // Synchronize into memory stories as well
-      memoryStories.unshift(created.toObject ? created.toObject() : created);
-      return res.json({ story: created });
+      const obj = created.toObject ? created.toObject() : created;
+      memoryStories[0] = obj;
+      return res.json({ story: obj });
     } catch (err) {
       console.error('DB create story error:', err.message);
     }
   }
 
-  // Dual Fallback: Save to Memory Array
-  storyData._id = `mem_${Date.now()}`;
-  memoryStories.unshift(storyData);
   return res.json({ story: storyData });
 });
 
@@ -299,7 +330,7 @@ app.get(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async 
     try {
       if (mongoose.Types.ObjectId.isValid(id)) {
         const story = await Story.findById(id);
-        if (story) return res.json({ story });
+        if (story) return res.json({ story: story.toObject ? story.toObject() : story });
       }
     } catch (err) {
       console.error('DB get story by id error:', err.message);
@@ -322,46 +353,48 @@ app.put(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async 
     updates.publishedAt = new Date();
   }
 
+  // Update memoryStories store
+  const idx = memoryStories.findIndex(s => s._id === id || s.slug === updates.slug);
+  if (idx !== -1) {
+    memoryStories[idx] = { ...memoryStories[idx], ...updates };
+  }
+
   const dbOk = await connectDB();
   if (dbOk) {
     try {
       if (mongoose.Types.ObjectId.isValid(id)) {
         const updated = await Story.findByIdAndUpdate(id, updates, { new: true });
-        if (updated) return res.json({ story: updated });
+        if (updated) return res.json({ story: updated.toObject ? updated.toObject() : updated });
       }
     } catch (err) {
       console.error('DB update story error:', err.message);
     }
   }
 
-  const idx = memoryStories.findIndex(s => s._id === id);
-  if (idx !== -1) {
-    memoryStories[idx] = { ...memoryStories[idx], ...updates };
-    return res.json({ story: memoryStories[idx] });
-  }
+  if (idx !== -1) return res.json({ story: memoryStories[idx] });
   return res.status(404).json({ error: 'Story not found.' });
 });
 
 // --- DELETE STORY (DELETE) ---
 app.delete(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
   const { id } = req.params;
+  
+  const idx = memoryStories.findIndex(s => s._id === id);
+  if (idx !== -1) {
+    memoryStories.splice(idx, 1);
+  }
+
   const dbOk = await connectDB();
   if (dbOk) {
     try {
       if (mongoose.Types.ObjectId.isValid(id)) {
         await Story.findByIdAndDelete(id);
-        return res.json({ success: true, id });
       }
     } catch (err) {
       console.error('DB delete story error:', err.message);
     }
   }
 
-  const idx = memoryStories.findIndex(s => s._id === id);
-  if (idx !== -1) {
-    memoryStories.splice(idx, 1);
-    return res.json({ success: true, id });
-  }
   return res.json({ success: true, id });
 });
 
@@ -372,23 +405,24 @@ app.patch(['/api/admin/stories/:id/status', '/admin/stories/:id/status'], authMi
   const updates = { status, updatedAt: new Date() };
   if (status === 'PUBLIC') updates.publishedAt = new Date();
 
+  const idx = memoryStories.findIndex(s => s._id === id);
+  if (idx !== -1) {
+    memoryStories[idx] = { ...memoryStories[idx], ...updates };
+  }
+
   const dbOk = await connectDB();
   if (dbOk) {
     try {
       if (mongoose.Types.ObjectId.isValid(id)) {
         const updated = await Story.findByIdAndUpdate(id, updates, { new: true });
-        if (updated) return res.json({ story: updated });
+        if (updated) return res.json({ story: updated.toObject ? updated.toObject() : updated });
       }
     } catch (err) {
       console.error('DB patch status error:', err.message);
     }
   }
 
-  const idx = memoryStories.findIndex(s => s._id === id);
-  if (idx !== -1) {
-    memoryStories[idx] = { ...memoryStories[idx], ...updates };
-    return res.json({ story: memoryStories[idx] });
-  }
+  if (idx !== -1) return res.json({ story: memoryStories[idx] });
   return res.status(404).json({ error: 'Story not found.' });
 });
 
