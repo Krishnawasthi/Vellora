@@ -1,4 +1,6 @@
 {
+  "buildCommand": "vite build client --outDir ../dist",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
