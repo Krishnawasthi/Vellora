@@ -12,7 +12,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Mongoose Connection Helper
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:password123@cluster0.mongodb.net/vellora?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://kmawasthi77_db_user:uk3iz5Tf2uA4rQcH@cluster0.d67klqp.mongodb.net/vellora?retryWrites=true&w=majority';
 const JWT_SECRET = process.env.JWT_SECRET || 'vellora_secret_key_2026';
 
 let isConnected = false;
@@ -20,27 +20,16 @@ async function connectDB() {
   if (isConnected && mongoose.connection.readyState === 1) return true;
   try {
     await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 8000
     });
     isConnected = true;
     return true;
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    console.error('MongoDB connection error:', err.message);
     return false;
   }
 }
-
-// Middleware to ensure DB connection before processing requests
-app.use(async (req, res, next) => {
-  if (req.path === '/api/health') return next();
-  const connected = await connectDB();
-  if (!connected && mongoose.connection.readyState !== 1) {
-    return res.status(500).json({
-      error: 'Database connection failed. Please check MONGODB_URI and ensure MongoDB Atlas allows connections from anywhere (0.0.0.0/0).'
-    });
-  }
-  next();
-});
 
 // Schemas
 const storySchema = new mongoose.Schema({
@@ -84,13 +73,21 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-// --- PUBLIC ROUTES ---
-app.get('/api/health', async (req, res) => {
-  const dbState = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
-  res.json({ status: 'OK', name: 'Vellora Vercel API', dbState, time: new Date().toISOString() });
+// Health Check
+app.get(['/', '/api/health', '/health'], async (req, res) => {
+  const dbOk = await connectDB();
+  res.json({
+    status: 'OK',
+    name: 'Vellora Vercel API',
+    database: dbOk ? 'Connected' : 'Disconnected',
+    time: new Date().toISOString()
+  });
 });
 
-app.get('/api/stories', async (req, res) => {
+// Public Stories List
+app.get(['/api/stories', '/stories'], async (req, res) => {
+  const dbOk = await connectDB();
+  if (!dbOk) return res.status(500).json({ error: 'Database connection failed. Ensure MongoDB Atlas Network Access is set to 0.0.0.0/0.' });
   try {
     const { category, search, language } = req.query;
     const query = { status: 'PUBLIC' };
@@ -105,22 +102,27 @@ app.get('/api/stories', async (req, res) => {
     const stories = await Story.find(query).sort({ publishedAt: -1, createdAt: -1 });
     res.json({ stories });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch stories.' });
+    res.status(500).json({ error: err.message || 'Failed to fetch stories.' });
   }
 });
 
-app.get('/api/stories/:slug', async (req, res) => {
+// Single Story Detail
+app.get(['/api/stories/:slug', '/stories/:slug'], async (req, res) => {
+  const dbOk = await connectDB();
+  if (!dbOk) return res.status(500).json({ error: 'Database connection failed.' });
   try {
     const story = await Story.findOne({ slug: req.params.slug, status: 'PUBLIC' });
     if (!story) return res.status(404).json({ error: 'Story not found.' });
     res.json(story);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch story.' });
+    res.status(500).json({ error: err.message || 'Failed to fetch story.' });
   }
 });
 
-// --- ADMIN ROUTES ---
-app.post('/api/admin/login', async (req, res) => {
+// Admin Login
+app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
+  const dbOk = await connectDB();
+  if (!dbOk) return res.status(500).json({ error: 'Database connection failed. Please verify MONGODB_URI and MongoDB Atlas IP access (0.0.0.0/0).' });
   try {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
@@ -143,7 +145,9 @@ app.post('/api/admin/login', async (req, res) => {
   }
 });
 
-app.get('/api/admin/stories', authMiddleware, async (req, res) => {
+// Admin Stories List
+app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
+  await connectDB();
   try {
     const { status, search } = req.query;
     const query = {};
@@ -162,11 +166,13 @@ app.get('/api/admin/stories', authMiddleware, async (req, res) => {
     
     res.json({ stories, stats: { total, published, drafts, private: privateCount } });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch admin stories.' });
+    res.status(500).json({ error: err.message || 'Failed to fetch admin stories.' });
   }
 });
 
-app.get('/api/admin/stories/:id', authMiddleware, async (req, res) => {
+// Admin Story Detail
+app.get(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
+  await connectDB();
   try {
     const story = await Story.findById(req.params.id);
     if (!story) return res.status(404).json({ error: 'Story not found.' });
@@ -176,7 +182,9 @@ app.get('/api/admin/stories/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/admin/stories', authMiddleware, async (req, res) => {
+// Create Story
+app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
+  await connectDB();
   try {
     const data = req.body;
     let baseSlug = (data.title || 'untitled-story').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'story';
@@ -194,7 +202,9 @@ app.post('/api/admin/stories', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/admin/stories/:id', authMiddleware, async (req, res) => {
+// Update Story
+app.put(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
+  await connectDB();
   try {
     const data = req.body;
     if (data.status === 'PUBLIC') {
@@ -208,7 +218,9 @@ app.put('/api/admin/stories/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/admin/stories/:id', authMiddleware, async (req, res) => {
+// Delete Story
+app.delete(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
+  await connectDB();
   try {
     await Story.findByIdAndDelete(req.params.id);
     res.json({ message: 'Story deleted successfully.' });
@@ -217,7 +229,9 @@ app.delete('/api/admin/stories/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.patch('/api/admin/stories/:id/status', authMiddleware, async (req, res) => {
+// Update Story Status
+app.patch(['/api/admin/stories/:id/status', '/admin/stories/:id/status'], authMiddleware, async (req, res) => {
+  await connectDB();
   try {
     const { status } = req.body;
     const updateData = { status };
@@ -227,6 +241,12 @@ app.patch('/api/admin/stories/:id/status', authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to update story status.' });
   }
+});
+
+// Global Error Handler to Prevent Serverless Crashes
+app.use((err, req, res, next) => {
+  console.error('API Error:', err);
+  res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
 module.exports = app;
