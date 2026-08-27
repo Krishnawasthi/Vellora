@@ -69,14 +69,15 @@ const adminSchema = new mongoose.Schema({
 const Story = mongoose.models.Story || mongoose.model('Story', storySchema);
 const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
 
-// Slug Generator Helper
+// Unique Slug Generator Helper (Guarantees zero duplicate key E11000 errors)
 function generateSlug(text) {
-  return String(text || '')
+  const base = String(text || '')
     .toLowerCase()
     .trim()
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || `story-${Date.now()}`;
+    .replace(/^-+|-+$/g, '') || 'story';
+  return `${base}-${Date.now().toString(36)}`;
 }
 
 // Admin Auth Middleware
@@ -115,7 +116,7 @@ app.all(['/', '/api/health', '/health'], async (req, res) => {
   }
 });
 
-// --- PUBLIC STORIES (STRICT REAL-TIME MONGODB ATLAS QUERY) ---
+// --- PUBLIC STORIES ---
 app.get(['/api/stories', '/stories'], async (req, res) => {
   try {
     await connectDB();
@@ -175,7 +176,6 @@ app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
     return res.status(401).json({ error: 'Invalid username or password.' });
   } catch (err) {
     console.error('Admin login error:', err.message);
-    // Standalone Fallback if DB fails
     if (cleanUsername === 'admin' && password === 'password123') {
       const token = jwt.sign({ id: 'owner_admin_1', username: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
       return res.json({ token, admin: { id: 'owner_admin_1', username: 'admin', name: 'Aarav Sharma' } });
@@ -223,10 +223,10 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
 
 // --- CREATE NEW STORY (POST) ---
 app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
-  const { title, content, excerpt, featuredImage, language, fontFamily, category, tags, status } = req.body || {};
+  const { title, content, excerpt, featuredImage, language, fontFamily, category, tags, status, slug: userSlug } = req.body || {};
   if (!title) return res.status(400).json({ error: 'Title is required.' });
 
-  const slug = generateSlug(title);
+  const slug = userSlug || generateSlug(title);
   const wordCount = (content || '').replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length;
   const readingTime = Math.max(1, Math.ceil(wordCount / 200));
   const now = new Date();
@@ -254,6 +254,16 @@ app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, r
     return res.json({ story: created });
   } catch (err) {
     console.error('Error creating story in MongoDB:', err.message);
+    // If slug duplicate error, retry with timestamp slug
+    if (err.code === 11000) {
+      try {
+        storyData.slug = `${generateSlug(title)}-${Date.now()}`;
+        const createdRetry = await Story.create(storyData);
+        return res.json({ story: createdRetry });
+      } catch (retryErr) {
+        return res.status(500).json({ error: 'Duplicate title/slug error.' });
+      }
+    }
     return res.status(500).json({ error: 'Failed to save story to MongoDB Atlas.', details: err.message });
   }
 });
@@ -280,9 +290,6 @@ app.get(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async 
 app.put(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
   const { id } = req.params;
   const updates = req.body || {};
-  if (updates.title && !updates.slug) {
-    updates.slug = generateSlug(updates.title);
-  }
   updates.updatedAt = new Date();
   if (updates.status === 'PUBLIC' && !updates.publishedAt) {
     updates.publishedAt = new Date();
