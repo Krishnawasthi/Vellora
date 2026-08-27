@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "node -e \"const fs=require('fs'), cp=require('child_process'); if(fs.existsSync('client')) { cp.execSync('cd client && npm install && npm run build', {stdio: 'inherit'}); } else { cp.execSync('npm run build', {stdio: 'inherit'}); }\" && node -e \"const fs=require('fs'); if(fs.existsSync('client/dist')){ fs.cpSync('client/dist', 'public', {recursive: true}); fs.cpSync('client/dist', 'dist', {recursive: true}); }\"",
+    "build": "npm install --prefix client && npm run build --prefix client && node -e \"const fs=require('fs'); if(fs.existsSync('client/dist')){ fs.cpSync('client/dist', 'public', {recursive: true}); fs.cpSync('client/dist', 'dist', {recursive: true}); }\"",
     "cd client && npm install && npm run build": "npm run build"
   },
   "dependencies": {
