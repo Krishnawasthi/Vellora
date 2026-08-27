@@ -18,7 +18,8 @@ async function connectDB() {
   if (isConnected && mongoose.connection.readyState === 1) return true;
   try {
     await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 3000
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000
     });
     isConnected = true;
     return true;
@@ -35,11 +36,11 @@ const storySchema = new mongoose.Schema({
   excerpt: { type: String, default: '' },
   content: { type: String, default: '' },
   featuredImage: { type: String, default: '' },
-  language: { type: String, enum: ['en', 'hi', 'mixed'], default: 'en' },
+  language: { type: String, default: 'en' },
   fontFamily: { type: String, default: 'georgia' },
   category: { type: String, default: 'General' },
   tags: [{ type: String }],
-  status: { type: String, enum: ['DRAFT', 'PUBLIC', 'PRIVATE'], default: 'DRAFT' },
+  status: { type: String, default: 'PUBLIC' },
   readingTime: { type: Number, default: 1 },
   publishedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
@@ -135,7 +136,7 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
   if (dbOk) {
     try {
       const { category, search, language } = req.query;
-      const query = { status: 'PUBLIC' };
+      const query = { status: { $ne: 'PRIVATE' } };
       if (category && category !== 'All') query.category = category;
       if (language && language !== 'all') query.language = language;
       if (search) {
@@ -150,8 +151,7 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
       console.error('DB fetch error:', err.message);
     }
   }
-  const publicMemStories = memoryStories.filter(s => s.status === 'PUBLIC');
-  return res.json({ stories: publicMemStories });
+  return res.json({ stories: memoryStories });
 });
 
 // --- SINGLE STORY DETAIL ---
@@ -234,7 +234,7 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
       }
       const stories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1 });
       const total = await Story.countDocuments();
-      const published = await Story.countDocuments({ status: 'PUBLIC' });
+      const published = await Story.countDocuments({ status: { $ne: 'PRIVATE' } });
       const drafts = await Story.countDocuments({ status: 'DRAFT' });
       const privateCount = await Story.countDocuments({ status: 'PRIVATE' });
       
@@ -277,6 +277,8 @@ app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, r
   if (dbOk) {
     try {
       const created = await Story.create(storyData);
+      // Synchronize into memory stories as well
+      memoryStories.unshift(created.toObject ? created.toObject() : created);
       return res.json({ story: created });
     } catch (err) {
       console.error('DB create story error:', err.message);
