@@ -77,9 +77,9 @@ export const StoryDetailPage: React.FC = () => {
   }[story.language] || 'English';
 
   return (
-    <article className="min-h-screen pb-24 space-y-8 max-w-4xl mx-auto px-4 sm:px-6 pt-6">
+    <article className="min-h-screen pb-24 space-y-8 max-w-3xl mx-auto px-4 sm:px-6 pt-6">
       
-      {/* Top Navigation */}
+      {/* Top Header Navigation */}
       <div className="flex items-center justify-between pb-4 border-b border-cream-300/60 dark:border-chocolate-800/60">
         <Link
           to="/stories"
@@ -107,79 +107,79 @@ export const StoryDetailPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Main Side-by-Side Reading Section */}
-      <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
-        
-        {/* Left Column: Small Featured Image */}
-        {story.featuredImage && (
-          <div className="w-full md:w-72 sm:w-60 flex-shrink-0">
-            <div className="relative aspect-[4/3] md:aspect-[3/4] rounded-2xl overflow-hidden shadow-md border border-cream-300 dark:border-chocolate-800">
-              <img
-                src={story.featuredImage}
-                alt={story.title}
-                className="w-full h-full object-cover object-center"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Right Column: Title, Metadata & Story Text */}
-        <div className="flex-1 space-y-4 w-full">
-          
-          {/* Category & Language Pills */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-chocolate-900 text-cream-50 dark:bg-cream-100 dark:text-chocolate-950 shadow-xs">
-              {story.category}
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cream-100 dark:bg-chocolate-900 text-chocolate-900 dark:text-cream-100 border border-cream-300 dark:border-chocolate-800 flex items-center gap-1 shadow-xs">
-              <Globe className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-              {languageLabel}
-            </span>
-          </div>
-
-          {/* Title */}
-          <h1 className={`text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-chocolate-950 dark:text-cream-50 leading-tight ${fontClass}`}>
-            {story.title}
-          </h1>
-
-          {/* Metadata */}
-          <div className="flex items-center gap-2.5 text-xs text-chocolate-700 dark:text-cream-300 font-serif italic pb-2 border-b border-cream-300/60 dark:border-chocolate-800/60">
-            <span>{formatDate(story.publishedAt || story.createdAt)}</span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              {formatReadingTime(story.readingTime)}
-            </span>
-          </div>
-
-          {/* Rich HTML Content */}
-          <div 
-            className={`prose prose-sm sm:prose max-w-none space-y-4 leading-relaxed text-chocolate-950 dark:text-cream-50 ${fontClass}
-              [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:text-chocolate-950 [&>h1]:dark:text-cream-50
-              [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-5 [&>h2]:mb-2 [&>h2]:text-chocolate-950 [&>h2]:dark:text-cream-50
-              [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-4 [&>h3]:mb-2 [&>h3]:text-chocolate-950 [&>h3]:dark:text-cream-50
-              [&>p]:text-sm [&>p]:sm:text-base [&>p]:leading-relaxed [&>p]:mb-4 [&>p]:text-chocolate-950 [&>p]:dark:text-cream-50
-              [&>blockquote]:border-l-4 [&>blockquote]:border-chocolate-500 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:my-4 [&>blockquote]:text-chocolate-900 [&>blockquote]:dark:text-cream-200
-              [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:space-y-1.5 [&>ul]:mb-4
-              [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:space-y-1.5 [&>ol]:mb-4
-              [&>img]:rounded-xl [&>img]:my-4 [&>img]:shadow-md [&>img]:max-w-md [&>img]:mx-auto`}
-            dangerouslySetInnerHTML={{ __html: story.content }}
-          />
-
-          {/* Tags */}
-          {story.tags && story.tags.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-cream-300/80 dark:border-chocolate-800 flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-bold text-chocolate-600 dark:text-cream-400 uppercase tracking-wider">Tags:</span>
-              {story.tags.map((tag, idx) => (
-                <span key={idx} className="px-2.5 py-0.5 rounded-md text-[11px] bg-cream-100 dark:bg-chocolate-900 text-chocolate-800 dark:text-cream-200 border border-cream-300 dark:border-chocolate-800 font-serif italic">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
-
+      {/* Story Title & Metadata */}
+      <header className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-chocolate-900 text-cream-50 dark:bg-cream-100 dark:text-chocolate-950 shadow-xs">
+            {story.category}
+          </span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cream-100 dark:bg-chocolate-900 text-chocolate-900 dark:text-cream-100 border border-cream-300 dark:border-chocolate-800 flex items-center gap-1 shadow-xs">
+            <Globe className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+            {languageLabel}
+          </span>
         </div>
 
+        <h1 className={`text-3xl sm:text-4xl font-bold tracking-tight text-chocolate-950 dark:text-cream-50 leading-tight ${fontClass}`}>
+          {story.title}
+        </h1>
+
+        <div className="flex items-center gap-2.5 text-xs text-chocolate-700 dark:text-cream-300 font-serif italic pb-2">
+          <span>{formatDate(story.publishedAt || story.createdAt)}</span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            {formatReadingTime(story.readingTime)}
+          </span>
+        </div>
+      </header>
+
+      {/* Hero Header with Small Left Image & Intro */}
+      {story.featuredImage && (
+        <div className="flex flex-col sm:flex-row gap-5 items-start p-4 rounded-2xl bg-cream-100/60 dark:bg-chocolate-900/40 border border-cream-300/80 dark:border-chocolate-800/80 shadow-xs">
+          <div className="w-full sm:w-48 h-36 flex-shrink-0 rounded-xl overflow-hidden shadow-sm border border-cream-300 dark:border-chocolate-800">
+            <img
+              src={story.featuredImage}
+              alt={story.title}
+              className="w-full h-full object-cover object-center"
+            />
+          </div>
+          {story.excerpt && (
+            <div className="flex-1 space-y-2 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-chocolate-600 dark:text-cream-400">Excerpt</span>
+              <p className="text-xs sm:text-sm font-serif italic leading-relaxed text-chocolate-800 dark:text-cream-200">
+                "{story.excerpt}"
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Body Text Container */}
+      <div className={`py-4 text-chocolate-950 dark:text-cream-50 ${fontClass}`}>
+        <div 
+          className="prose prose-sm sm:prose-base max-w-none space-y-4 leading-relaxed text-chocolate-950 dark:text-cream-50
+            [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:text-chocolate-950 [&>h1]:dark:text-cream-50
+            [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-5 [&>h2]:mb-2 [&>h2]:text-chocolate-950 [&>h2]:dark:text-cream-50
+            [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-4 [&>h3]:mb-2 [&>h3]:text-chocolate-950 [&>h3]:dark:text-cream-50
+            [&>p]:text-sm [&>p]:sm:text-base [&>p]:leading-relaxed [&>p]:mb-4 [&>p]:text-chocolate-950 [&>p]:dark:text-cream-50
+            [&>blockquote]:border-l-4 [&>blockquote]:border-chocolate-500 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:my-4 [&>blockquote]:text-chocolate-900 [&>blockquote]:dark:text-cream-200
+            [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:space-y-1.5 [&>ul]:mb-4
+            [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:space-y-1.5 [&>ol]:mb-4
+            [&>img]:rounded-xl [&>img]:my-4 [&>img]:shadow-md [&>img]:max-w-md [&>img]:mx-auto"
+          dangerouslySetInnerHTML={{ __html: story.content }}
+        />
+
+        {/* Tags */}
+        {story.tags && story.tags.length > 0 && (
+          <div className="mt-8 pt-4 border-t border-cream-300/80 dark:border-chocolate-800 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-chocolate-600 dark:text-cream-400 uppercase tracking-wider">Tags:</span>
+            {story.tags.map((tag, idx) => (
+              <span key={idx} className="px-2.5 py-0.5 rounded-md text-[11px] bg-cream-100 dark:bg-chocolate-900 text-chocolate-800 dark:text-cream-200 border border-cream-300 dark:border-chocolate-800 font-serif italic">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer Return Link */}
