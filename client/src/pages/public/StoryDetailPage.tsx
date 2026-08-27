@@ -133,19 +133,21 @@ export const StoryDetailPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Hero Header with Small Left Image & Intro */}
+      {/* Hero Header with Half-Box Image & Intro */}
       {story.featuredImage && (
-        <div className="flex flex-col sm:flex-row gap-5 items-start p-4 rounded-2xl bg-cream-100/60 dark:bg-chocolate-900/40 border border-cream-300/80 dark:border-chocolate-800/80 shadow-xs">
-          <div className="w-full sm:w-48 h-36 flex-shrink-0 rounded-xl overflow-hidden shadow-sm border border-cream-300 dark:border-chocolate-800">
+        <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 items-stretch p-4 sm:p-5 rounded-2xl bg-cream-100/60 dark:bg-chocolate-900/40 border border-cream-300/80 dark:border-chocolate-800/80 shadow-xs">
+          {/* Half-box Left Image */}
+          <div className="w-full sm:w-1/2 sm:max-w-[48%] h-48 sm:h-56 flex-shrink-0 rounded-xl overflow-hidden shadow-sm border border-cream-300 dark:border-chocolate-800">
             <img
               src={story.featuredImage}
               alt={story.title}
               className="w-full h-full object-cover object-center"
             />
           </div>
+          {/* Right Text */}
           {story.excerpt && (
-            <div className="flex-1 space-y-2 pt-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-chocolate-600 dark:text-cream-400">Excerpt</span>
+            <div className="flex-1 sm:w-1/2 p-1 space-y-2 flex flex-col justify-center">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-chocolate-600 dark:text-cream-400">Story Overview</span>
               <p className="text-xs sm:text-sm font-serif italic leading-relaxed text-chocolate-800 dark:text-cream-200">
                 "{story.excerpt}"
               </p>
