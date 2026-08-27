@@ -41,7 +41,7 @@ const storySchema = new mongoose.Schema({
   tags: [{ type: String }],
   status: { type: String, enum: ['DRAFT', 'PUBLIC', 'PRIVATE'], default: 'DRAFT' },
   readingTime: { type: Number, default: 1 },
-  publishedAt: { type: Date }
+  publishedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
 const adminSchema = new mongoose.Schema({
@@ -144,7 +144,7 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
           { excerpt: { $regex: search, $options: 'i' } }
         ];
       }
-      const stories = await Story.find(query).sort({ publishedAt: -1, createdAt: -1 });
+      const stories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1, publishedAt: -1 });
       return res.json({ stories });
     } catch (err) {
       console.error('DB fetch error:', err.message);
@@ -159,7 +159,7 @@ app.get(['/api/stories/:slug', '/stories/:slug'], async (req, res) => {
   const dbOk = await connectDB();
   if (dbOk) {
     try {
-      const story = await Story.findOne({ slug: req.params.slug, status: 'PUBLIC' });
+      const story = await Story.findOne({ slug: req.params.slug });
       if (story) return res.json(story);
     } catch (err) {
       console.error('DB findOne error:', err.message);
@@ -232,7 +232,7 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
           { excerpt: { $regex: search, $options: 'i' } }
         ];
       }
-      const stories = await Story.find(query).sort({ updatedAt: -1, createdAt: -1 });
+      const stories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1 });
       const total = await Story.countDocuments();
       const published = await Story.countDocuments({ status: 'PUBLIC' });
       const drafts = await Story.countDocuments({ status: 'DRAFT' });
@@ -254,6 +254,7 @@ app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, r
   const slug = generateSlug(title);
   const wordCount = (content || '').replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length;
   const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+  const now = new Date();
 
   const storyData = {
     title,
@@ -265,11 +266,11 @@ app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, r
     fontFamily: fontFamily || 'georgia',
     category: category || 'General',
     tags: Array.isArray(tags) ? tags : (tags ? String(tags).split(',').map(t => t.trim()) : []),
-    status: status || 'DRAFT',
+    status: status || 'PUBLIC',
     readingTime,
-    publishedAt: status === 'PUBLIC' ? new Date() : null,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    publishedAt: now,
+    createdAt: now,
+    updatedAt: now
   };
 
   const dbOk = await connectDB();
@@ -314,10 +315,10 @@ app.put(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async 
   if (updates.title && !updates.slug) {
     updates.slug = generateSlug(updates.title);
   }
+  updates.updatedAt = new Date();
   if (updates.status === 'PUBLIC' && !updates.publishedAt) {
     updates.publishedAt = new Date();
   }
-  updates.updatedAt = new Date();
 
   const dbOk = await connectDB();
   if (dbOk) {
