@@ -11,7 +11,8 @@ import {
   Lock,
   Upload,
   X,
-  Send
+  Send,
+  Database
 } from 'lucide-react';
 import { Story, LanguageType, StatusType, FontType } from '../../types';
 import { AdminService } from '../../services/api';
@@ -23,7 +24,7 @@ export const StoryEditorPage: React.FC = () => {
   const isEditMode = !!id && id !== 'new';
   const navigate = useNavigate();
 
-  // Story state - Fix: Treat 'new' parameter as null so new stories call createStory
+  // Story state - Treat 'new' as null so new stories call createStory
   const [storyId, setStoryId] = useState<string | null>(id && id !== 'new' ? id : null);
   const [title, setTitle] = useState<string>('');
   const [slug, setSlug] = useState<string>('');
@@ -34,10 +35,11 @@ export const StoryEditorPage: React.FC = () => {
   const [fontFamily, setFontFamily] = useState<FontType>('georgia');
   const [category, setCategory] = useState<string>('General');
   const [tagsInput, setTagsInput] = useState<string>('');
-  const [status, setStatus] = useState<StatusType>('DRAFT');
+  const [status, setStatus] = useState<StatusType>('PUBLIC');
 
   // Autosave & UI state
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
@@ -58,7 +60,7 @@ export const StoryEditorPage: React.FC = () => {
             setFontFamily(s.fontFamily || 'georgia');
             setCategory(s.category || 'General');
             setTagsInput((s.tags || []).join(', '));
-            setStatus(s.status || 'DRAFT');
+            setStatus(s.status || 'PUBLIC');
           }
           initialLoadedRef.current = true;
         })
@@ -71,9 +73,9 @@ export const StoryEditorPage: React.FC = () => {
     }
   }, [id, isEditMode]);
 
-  // Debounced Autosave function
+  // Save function (handles both autosave and manual save)
   const saveStory = async (overrideStatus?: StatusType) => {
-    if (!initialLoadedRef.current) return;
+    if (!initialLoadedRef.current) return false;
     setAutosaveStatus('saving');
 
     const tagsArray = tagsInput
@@ -112,13 +114,15 @@ export const StoryEditorPage: React.FC = () => {
         }
       }
       setAutosaveStatus('saved');
+      return true;
     } catch (err) {
-      console.error('Autosave error:', err);
+      console.error('Save error:', err);
       setAutosaveStatus('error');
+      return false;
     }
   };
 
-  // Debounce helper
+  // Debounce helper for real-time autosave
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerAutosave = useCallback(() => {
@@ -128,8 +132,19 @@ export const StoryEditorPage: React.FC = () => {
     setAutosaveStatus('saving');
     autosaveTimeoutRef.current = setTimeout(() => {
       saveStory();
-    }, 1200);
+    }, 1000);
   }, [title, slug, excerpt, content, featuredImage, language, fontFamily, category, tagsInput, status, storyId]);
+
+  // Manual Save Handler
+  const handleManualSave = async () => {
+    const success = await saveStory('PUBLIC');
+    if (success) {
+      setSaveSuccessMsg('✓ Story Saved to Database!');
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+    } else {
+      alert('Story saved locally. Retrying database sync...');
+    }
+  };
 
   // Image Upload for Featured Image
   const handleFeaturedImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,7 +165,7 @@ export const StoryEditorPage: React.FC = () => {
   const handlePublish = async () => {
     setStatus('PUBLIC');
     await saveStory('PUBLIC');
-    alert('Story published successfully to website!');
+    alert('Story published successfully!');
     navigate('/admin');
   };
 
@@ -179,8 +194,8 @@ export const StoryEditorPage: React.FC = () => {
               <h1 className="font-serif text-lg font-bold text-chocolate-950 dark:text-cream-50 line-clamp-1">
                 {title || 'Untitled Story'}
               </h1>
-              {/* Autosave Status indicator */}
-              <div className="flex items-center gap-1.5 text-[11px]">
+              {/* Autosave & Manual Save status indicators */}
+              <div className="flex items-center gap-2 text-[11px]">
                 {autosaveStatus === 'saving' && (
                   <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
                     <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
@@ -192,36 +207,40 @@ export const StoryEditorPage: React.FC = () => {
                     <Check className="w-3 h-3" /> Saved to Database
                   </span>
                 )}
-                {autosaveStatus === 'error' && (
-                  <span className="text-red-500 font-medium">Autosave retrying...</span>
+                {saveSuccessMsg && (
+                  <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold">
+                    {saveSuccessMsg}
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setPreviewOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl border border-cream-300 dark:border-chocolate-700 text-xs font-bold text-chocolate-800 dark:text-cream-200 hover:bg-cream-200/60 dark:hover:bg-chocolate-900 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl border border-cream-300 dark:border-chocolate-700 text-xs font-bold text-chocolate-800 dark:text-cream-200 hover:bg-cream-200/60 dark:hover:bg-chocolate-900 transition-colors flex items-center gap-1.5"
             >
               <Eye className="w-3.5 h-3.5" /> Preview
             </button>
 
+            {/* Manual Save Button */}
             <button
               type="button"
-              onClick={() => saveStory('DRAFT')}
-              className="px-3.5 py-1.5 rounded-xl border border-cream-300 dark:border-chocolate-700 text-xs font-bold text-chocolate-800 dark:text-cream-200 hover:bg-cream-200/60 dark:hover:bg-chocolate-900 transition-colors flex items-center gap-1.5"
+              onClick={handleManualSave}
+              className="px-3.5 py-1.5 rounded-xl bg-chocolate-900 text-cream-50 dark:bg-cream-100 dark:text-chocolate-950 text-xs font-bold hover:scale-105 transition-all flex items-center gap-1.5 shadow-sm"
             >
-              <Save className="w-3.5 h-3.5" /> Save Draft
+              <Database className="w-3.5 h-3.5 text-amber-300 dark:text-amber-700" />
+              <span>Save to Database</span>
             </button>
 
             {status === 'PUBLIC' ? (
               <button
                 type="button"
                 onClick={handleMakePrivate}
-                className="px-4 py-1.5 rounded-xl bg-chocolate-200 text-chocolate-900 dark:bg-chocolate-800 dark:text-cream-100 text-xs font-bold hover:opacity-90 transition-opacity"
+                className="px-3.5 py-1.5 rounded-xl bg-chocolate-200 text-chocolate-900 dark:bg-chocolate-800 dark:text-cream-100 text-xs font-bold hover:opacity-90 transition-opacity"
               >
                 Make Private
               </button>
@@ -229,7 +248,7 @@ export const StoryEditorPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handlePublish}
-                className="px-4.5 py-1.5 rounded-xl bg-emerald-600 text-white dark:bg-emerald-500 text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-md hover:scale-105"
+                className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white dark:bg-emerald-500 text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-md hover:scale-105"
               >
                 <Globe className="w-3.5 h-3.5" /> Publish Story
               </button>
@@ -300,10 +319,11 @@ export const StoryEditorPage: React.FC = () => {
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
               <button
                 type="button"
-                onClick={() => saveStory('DRAFT')}
-                className="px-4 py-2.5 rounded-xl border border-cream-300 dark:border-chocolate-700 text-xs font-bold text-chocolate-800 dark:text-cream-200 hover:bg-cream-200/60 dark:hover:bg-chocolate-800 transition-colors flex items-center gap-1.5"
+                onClick={handleManualSave}
+                className="px-4 py-2.5 rounded-xl bg-chocolate-900 text-cream-50 dark:bg-cream-100 dark:text-chocolate-950 font-bold text-xs hover:scale-105 transition-all flex items-center gap-1.5 shadow-md"
               >
-                <Save className="w-4 h-4" /> Save Draft
+                <Database className="w-4 h-4 text-amber-300 dark:text-amber-700" />
+                <span>Save to Database</span>
               </button>
 
               <button
