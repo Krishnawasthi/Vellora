@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: (import.meta as any).env?.VITE_API_URL || '/api',
 });
 
 // Interceptor to attach Authorization header if token exists
@@ -23,11 +23,11 @@ export const PublicService = {
   },
   getStoryBySlug: async (slug: string) => {
     const res = await api.get(`/stories/${slug}`);
-    return res.data.story;
+    return res.data.story || res.data;
   },
   getCategories: async () => {
     const res = await api.get('/categories');
-    return res.data.categories;
+    return res.data.categories || [];
   },
 };
 
@@ -39,7 +39,7 @@ export const AdminService = {
   },
   getMe: async () => {
     const res = await api.get('/admin/me');
-    return res.data.admin;
+    return res.data.admin || res.data;
   },
   updateSettings: async (data: any) => {
     const res = await api.put('/admin/settings', data);
@@ -51,15 +51,15 @@ export const AdminService = {
   },
   getStoryById: async (id: string) => {
     const res = await api.get(`/admin/stories/${id}`);
-    return res.data.story;
+    return res.data.story || res.data;
   },
   createStory: async (data: any) => {
     const res = await api.post('/admin/stories', data);
-    return res.data.story;
+    return res.data.story || res.data;
   },
   updateStory: async (id: string, data: any) => {
     const res = await api.put(`/admin/stories/${id}`, data);
-    return res.data.story;
+    return res.data.story || res.data;
   },
   deleteStory: async (id: string) => {
     const res = await api.delete(`/admin/stories/${id}`);
@@ -67,7 +67,7 @@ export const AdminService = {
   },
   toggleStatus: async (id: string, status: string) => {
     const res = await api.patch(`/admin/stories/${id}/status`, { status });
-    return res.data.story;
+    return res.data.story || res.data;
   },
   uploadImage: async (file: File) => {
     const formData = new FormData();
