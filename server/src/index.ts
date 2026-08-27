@@ -36,12 +36,16 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', name: 'Vellora API', time: new Date().toISOString() });
 });
 
-// Connect DB, seed data and start server
-connectDB().then(async () => {
-  await seedDatabase();
-  app.listen(PORT, () => {
-    console.log(`=======================================================`);
-    console.log(`  Vellora Server running on http://localhost:${PORT}`);
-    console.log(`=======================================================`);
+// Connect DB, seed data and start server in standalone environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  connectDB().then(async () => {
+    await seedDatabase();
+    app.listen(PORT, () => {
+      console.log(`=======================================================`);
+      console.log(`  Vellora Server running on http://localhost:${PORT}`);
+      console.log(`=======================================================`);
+    });
   });
-});
+}
+
+export default app;
