@@ -1,0 +1,59 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        inter: ['Inter', 'sans-serif'],
+        georgia: ['Georgia', 'serif'],
+        merriweather: ['Merriweather', 'serif'],
+        lora: ['Lora', 'serif'],
+        playfair: ['"Playfair Display"', 'serif'],
+        'noto-sans-devanagari': ['"Noto Sans Devanagari"', 'sans-serif'],
+        'noto-serif-devanagari': ['"Noto Serif Devanagari"', 'serif'],
+        mukta: ['Mukta', 'sans-serif'],
+        hind: ['Hind', 'sans-serif'],
+      },
+      colors: {
+        cream: {
+          50: '#FDFBF7',
+          100: '#F6F0E6',
+          200: '#EFE4D2',
+          300: '#E2D1B7',
+          400: '#CDB494',
+        },
+        chocolate: {
+          50: '#F9F4F0',
+          100: '#EBD8C7',
+          200: '#D7B497',
+          300: '#BE8C66',
+          400: '#A47148',
+          500: '#8C5734',
+          600: '#734325',
+          700: '#5C331B',
+          800: '#432311',
+          900: '#2A1408',
+          950: '#1A0B04',
+        },
+        warm: {
+          50: '#FDFBF7',
+          100: '#F6F0E6',
+          200: '#EFE4D2',
+          300: '#E2D1B7',
+          400: '#CDB494',
+          500: '#A48261',
+          600: '#7B5D41',
+          700: '#5C432D',
+          800: '#3D2A1B',
+          900: '#2A1A0F',
+          950: '#1A0F08',
+        },
+      },
+    },
+  },
+  plugins: [],
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="vellora-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1C1917" />
+      <stop offset="100%" stop-color="#44403C" />
+    </linearGradient>
+    <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D97706" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+  </defs>
+  <!-- Background Badge -->
+  <rect x="5" y="5" width="90" height="90" rx="28" fill="url(#vellora-grad)" />
+  <!-- Elegant V Monogram with Quill Leaf Accent -->
+  <path d="M 28 32 L 48 72 C 49 74 51 74 52 72 L 72 32 C 73 30 71 28 69 28 L 60 28 C 58.5 28 57.5 29 57 30 L 50 52 L 43 30 C 42.5 29 41.5 28 40 28 L 31 28 C 29 28 27 30 28 32 Z" fill="#FDFBF7" />
+  <circle cx="68" cy="28" r="4.5" fill="url(#accent-grad)" />
+</svg>

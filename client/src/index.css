@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-main: #FDFBF7;
+    --text-main: #2A1408;
+  }
+
+  html.dark {
+    --bg-main: #1A0B04;
+    --text-main: #F6F0E6;
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    min-height: 100%;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    min-height: 100vh;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  #root {
+    background-color: var(--bg-main);
+    min-height: 100vh;
+  }
+}
+
+/* Ensure prose HTML content elements inherit high-contrast theme text colors */
+.prose p, 
+.prose h1, 
+.prose h2, 
+.prose h3, 
+.prose h4, 
+.prose span, 
+.prose li, 
+.prose strong, 
+.prose em, 
+.prose code,
+.prose div {
+  color: var(--text-main) !important;
+}
+
+.prose blockquote {
+  color: var(--text-main) !important;
+  border-left-color: #8C5734 !important;
+  opacity: 0.9;
+}
+
+/* ==========================================
+   Quill Editor Custom Theme Styling
+   ========================================== */
+.quill-editor-wrapper .ql-toolbar.ql-snow {
+  background-color: rgba(246, 240, 230, 0.95);
+  border: none !important;
+  border-bottom: 1px solid rgba(220, 210, 195, 0.8) !important;
+  padding: 10px 14px;
+}
+
+html.dark .quill-editor-wrapper .ql-toolbar.ql-snow {
+  background-color: rgba(26, 11, 4, 0.95);
+  border-bottom-color: rgba(60, 30, 15, 0.8) !important;
+}
+
+.quill-editor-wrapper .ql-container.ql-snow {
+  border: none !important;
+  min-height: 420px;
+  font-size: 1.125rem;
+}
+
+.quill-editor-wrapper .ql-editor {
+  min-height: 420px;
+  padding: 1.5rem;
+  color: var(--text-main) !important;
+  line-height: 1.7;
+}
+
+.quill-editor-wrapper .ql-editor p {
+  color: var(--text-main) !important;
+  margin-bottom: 1em;
+}
+
+.quill-editor-wrapper .ql-editor.ql-blank::before {
+  color: #A48261 !important;
+  font-style: italic;
+  left: 1.5rem;
+}
+
+html.dark .quill-editor-wrapper .ql-snow .ql-stroke {
+  stroke: #F6F0E6 !important;
+}
+
+html.dark .quill-editor-wrapper .ql-snow .ql-fill {
+  fill: #F6F0E6 !important;
+}
+
+html.dark .quill-editor-wrapper .ql-snow .ql-picker {
+  color: #F6F0E6 !important;
+}
+
+html.dark .quill-editor-wrapper .ql-snow .ql-picker-options {
+  background-color: #2A1408 !important;
+  border-color: #5C3218 !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(160, 150, 140, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 130, 120, 0.6);
+}
