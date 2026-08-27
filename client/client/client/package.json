@@ -1,0 +1,7 @@
+{
+  "name": "client-subfolder-fix-2",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd .. && npm run build"
+  }
+}
