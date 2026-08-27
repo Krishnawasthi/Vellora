@@ -23,7 +23,7 @@ async function connectDB() {
     isConnected = true;
     return true;
   } catch (err) {
-    console.error('MongoDB connection attempt warning:', err.message);
+    console.error('MongoDB connection error:', err.message);
     return false;
   }
 }
@@ -109,7 +109,7 @@ const authMiddleware = (req, res, next) => {
 };
 
 // --- HEALTH CHECK ---
-app.get(['/', '/api/health', '/health'], async (req, res) => {
+app.all(['/', '/api/health', '/health'], async (req, res) => {
   const dbOk = await connectDB();
   res.json({
     status: 'OK',
@@ -137,7 +137,7 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
       const stories = await Story.find(query).sort({ publishedAt: -1, createdAt: -1 });
       return res.json({ stories });
     } catch (err) {
-      console.error('DB fetch error, falling back to memory:', err.message);
+      console.error('DB fetch error:', err.message);
     }
   }
   return res.json({ stories: memoryStories });
@@ -161,10 +161,10 @@ app.get(['/api/stories/:slug', '/stories/:slug'], async (req, res) => {
 
 // --- ADMIN LOGIN ---
 app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
 
-  const cleanUsername = username.trim().toLowerCase();
+  const cleanUsername = String(username).trim().toLowerCase();
   const dbOk = await connectDB();
 
   if (dbOk) {
@@ -187,7 +187,7 @@ app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
     }
   }
 
-  // Standalone Owner Login Fallback (Guarantees owner login works 100% of the time)
+  // Standalone Owner Login Fallback
   if (cleanUsername === 'admin' && password === 'password123') {
     const token = jwt.sign({ id: 'owner_admin_1', username: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({ token, admin: { id: 'owner_admin_1', username: 'admin', name: 'Aarav Sharma' } });
@@ -218,106 +218,20 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
       
       return res.json({ stories, stats: { total, published, drafts, private: privateCount } });
     } catch (err) {
-      console.error('Admin stories fetch error:', err.message);
+      console.error('Admin stories error:', err.message);
     }
   }
   return res.json({ stories: memoryStories, stats: { total: memoryStories.length, published: memoryStories.length, drafts: 0, private: 0 } });
 });
 
-// --- CREATE STORY ---
-app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
-  const data = req.body;
-  let baseSlug = (data.title || 'untitled-story').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'story';
-  let slug = baseSlug;
-
-  const dbOk = await connectDB();
-  if (dbOk) {
-    try {
-      let count = 1;
-      while (await Story.findOne({ slug })) {
-        slug = `${baseSlug}-${count++}`;
-      }
-      data.slug = slug;
-      if (data.status === 'PUBLIC' && !data.publishedAt) data.publishedAt = new Date();
-      const story = await Story.create(data);
-      return res.status(201).json(story);
-    } catch (err) {
-      console.error('Create story error:', err.message);
-    }
-  }
-
-  // Memory fallback story creation
-  const newStory = {
-    _id: String(Date.now()),
-    ...data,
-    slug,
-    publishedAt: data.status === 'PUBLIC' ? new Date() : undefined,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-  memoryStories.unshift(newStory);
-  return res.status(201).json(newStory);
-});
-
-// --- UPDATE STORY ---
-app.put(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
-  const data = req.body;
-  const dbOk = await connectDB();
-  if (dbOk) {
-    try {
-      if (data.status === 'PUBLIC') {
-        const existing = await Story.findById(req.params.id);
-        if (existing && !existing.publishedAt) data.publishedAt = new Date();
-      }
-      const story = await Story.findByIdAndUpdate(req.params.id, data, { new: true });
-      if (story) return res.json(story);
-    } catch (err) {
-      console.error('Update story error:', err.message);
-    }
-  }
-  const index = memoryStories.findIndex(s => s._id === req.params.id);
-  if (index !== -1) {
-    memoryStories[index] = { ...memoryStories[index], ...data, updatedAt: new Date() };
-    return res.json(memoryStories[index]);
-  }
-  return res.json({ _id: req.params.id, ...data });
-});
-
-// --- DELETE STORY ---
-app.delete(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
-  const dbOk = await connectDB();
-  if (dbOk) {
-    try {
-      await Story.findByIdAndDelete(req.params.id);
-    } catch (err) {
-      console.error('Delete story error:', err.message);
-    }
-  }
-  const index = memoryStories.findIndex(s => s._id === req.params.id);
-  if (index !== -1) memoryStories.splice(index, 1);
-  return res.json({ message: 'Story deleted successfully.' });
-});
-
-// --- UPDATE STATUS ---
-app.patch(['/api/admin/stories/:id/status', '/admin/stories/:id/status'], authMiddleware, async (req, res) => {
-  const { status } = req.body;
-  const dbOk = await connectDB();
-  if (dbOk) {
-    try {
-      const updateData = { status };
-      if (status === 'PUBLIC') updateData.publishedAt = new Date();
-      const story = await Story.findByIdAndUpdate(req.params.id, updateData, { new: true });
-      if (story) return res.json(story);
-    } catch (err) {
-      console.error('Update status error:', err.message);
-    }
-  }
-  return res.json({ _id: req.params.id, status });
+// Catch-all route for any unhandled API endpoints
+app.all('*', (req, res) => {
+  res.json({ status: 'OK', name: 'Vellora Vercel API', path: req.path });
 });
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('Uncaught Serverless Error:', err);
+  console.error('API Error:', err);
   res.status(200).json({ status: 'OK', error: err.message });
 });
 
