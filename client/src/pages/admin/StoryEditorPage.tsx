@@ -20,11 +20,11 @@ import { FONT_OPTIONS, getFontClass } from '../../utils/fonts';
 
 export const StoryEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const isEditMode = !!id;
+  const isEditMode = !!id && id !== 'new';
   const navigate = useNavigate();
 
-  // Story state
-  const [storyId, setStoryId] = useState<string | null>(id || null);
+  // Story state - Fix: Treat 'new' parameter as null so new stories call createStory
+  const [storyId, setStoryId] = useState<string | null>(id && id !== 'new' ? id : null);
   const [title, setTitle] = useState<string>('');
   const [slug, setSlug] = useState<string>('');
   const [excerpt, setExcerpt] = useState<string>('');
@@ -45,22 +45,27 @@ export const StoryEditorPage: React.FC = () => {
 
   // Fetch story if editing
   useEffect(() => {
-    if (isEditMode && id) {
+    if (isEditMode && id && id !== 'new') {
       AdminService.getStoryById(id)
         .then((s: Story) => {
-          setTitle(s.title || '');
-          setSlug(s.slug || '');
-          setExcerpt(s.excerpt || '');
-          setContent(s.content || '');
-          setFeaturedImage(s.featuredImage || '');
-          setLanguage(s.language || 'en');
-          setFontFamily(s.fontFamily || 'georgia');
-          setCategory(s.category || 'General');
-          setTagsInput((s.tags || []).join(', '));
-          setStatus(s.status || 'DRAFT');
+          if (s) {
+            setTitle(s.title || '');
+            setSlug(s.slug || '');
+            setExcerpt(s.excerpt || '');
+            setContent(s.content || '');
+            setFeaturedImage(s.featuredImage || '');
+            setLanguage(s.language || 'en');
+            setFontFamily(s.fontFamily || 'georgia');
+            setCategory(s.category || 'General');
+            setTagsInput((s.tags || []).join(', '));
+            setStatus(s.status || 'DRAFT');
+          }
           initialLoadedRef.current = true;
         })
-        .catch((err) => console.error('Error fetching story:', err));
+        .catch((err) => {
+          console.error('Error fetching story:', err);
+          initialLoadedRef.current = true;
+        });
     } else {
       initialLoadedRef.current = true;
     }
@@ -76,6 +81,8 @@ export const StoryEditorPage: React.FC = () => {
       .map((t) => t.trim())
       .filter(Boolean);
 
+    const targetStatus = overrideStatus || status;
+
     const payload = {
       title: title || 'Untitled Story',
       slug,
@@ -86,18 +93,23 @@ export const StoryEditorPage: React.FC = () => {
       fontFamily,
       category,
       tags: tagsArray,
-      status: overrideStatus || status,
+      status: targetStatus,
     };
 
     try {
-      if (storyId) {
+      if (storyId && storyId !== 'new') {
         const updated = await AdminService.updateStory(storyId, payload);
-        if (updated.slug) setSlug(updated.slug);
+        if (updated && updated.slug) setSlug(updated.slug);
       } else {
         const created = await AdminService.createStory(payload);
-        setStoryId(created._id);
-        if (created.slug) setSlug(created.slug);
-        window.history.replaceState(null, '', `/admin/stories/${created._id}/edit`);
+        if (created) {
+          const newId = created._id || created.id;
+          if (newId) {
+            setStoryId(newId);
+            window.history.replaceState(null, '', `/admin/stories/${newId}/edit`);
+          }
+          if (created.slug) setSlug(created.slug);
+        }
       }
       setAutosaveStatus('saved');
     } catch (err) {
@@ -116,7 +128,7 @@ export const StoryEditorPage: React.FC = () => {
     setAutosaveStatus('saving');
     autosaveTimeoutRef.current = setTimeout(() => {
       saveStory();
-    }, 1500);
+    }, 1200);
   }, [title, slug, excerpt, content, featuredImage, language, fontFamily, category, tagsInput, status, storyId]);
 
   // Image Upload for Featured Image
@@ -128,7 +140,7 @@ export const StoryEditorPage: React.FC = () => {
         setFeaturedImage(res.url);
         saveStory();
       } catch (err) {
-        alert('Failed to upload image');
+        alert('Failed to process image');
       } finally {
         setIsUploading(false);
       }
@@ -138,7 +150,7 @@ export const StoryEditorPage: React.FC = () => {
   const handlePublish = async () => {
     setStatus('PUBLIC');
     await saveStory('PUBLIC');
-    alert('Story published successfully!');
+    alert('Story published successfully to website!');
     navigate('/admin');
   };
 
@@ -177,11 +189,11 @@ export const StoryEditorPage: React.FC = () => {
                 )}
                 {autosaveStatus === 'saved' && (
                   <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Saved just now
+                    <Check className="w-3 h-3" /> Saved to Database
                   </span>
                 )}
                 {autosaveStatus === 'error' && (
-                  <span className="text-red-500 font-medium">Autosave failed</span>
+                  <span className="text-red-500 font-medium">Autosave retrying...</span>
                 )}
               </div>
             </div>
@@ -354,7 +366,7 @@ export const StoryEditorPage: React.FC = () => {
                   htmlFor="featured-upload-input"
                   className="inline-block px-3.5 py-1.5 rounded-lg bg-chocolate-900 text-cream-50 dark:bg-cream-100 dark:text-chocolate-950 text-xs font-bold cursor-pointer"
                 >
-                  {isUploading ? 'Uploading...' : 'Choose Image'}
+                  {isUploading ? 'Processing...' : 'Choose Image'}
                 </label>
               </div>
             )}
@@ -473,8 +485,8 @@ export const StoryEditorPage: React.FC = () => {
             </label>
             <div className="space-y-2">
               {[
-                { id: 'DRAFT', label: 'DRAFT — Visible only in owner editor' },
                 { id: 'PUBLIC', label: 'PUBLIC — Visible to everyone on site' },
+                { id: 'DRAFT', label: 'DRAFT — Visible only in owner editor' },
                 { id: 'PRIVATE', label: 'PRIVATE — Restricted to owner only' },
               ].map((st) => (
                 <label key={st.id} className="flex items-center gap-2 text-xs text-chocolate-700 dark:text-cream-300 cursor-pointer font-medium">
