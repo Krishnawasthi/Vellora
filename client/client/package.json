@@ -1,7 +1,7 @@
 {
-  "name": "client-subfolder-fix",
+  "name": "client-fallback-l1",
   "version": "1.0.0",
   "scripts": {
-    "build": "cd .. && npm run build"
+    "build": "tsc && vite build"
   }
 }

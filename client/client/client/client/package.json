@@ -1,5 +1,5 @@
 {
-  "name": "client-fallback-l2",
+  "name": "client-fallback-l3",
   "version": "1.0.0",
   "scripts": {
     "build": "tsc && vite build"
