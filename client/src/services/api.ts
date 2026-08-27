@@ -75,12 +75,12 @@ export const AdminService = {
     const res = await api.patch(`/admin/stories/${id}/status`, { status });
     return res.data.story || res.data;
   },
-  uploadImage: async (file: File) => {
-    const formData = new FormData();
-    formData.append('image', file);
-    const res = await api.post('/admin/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+  uploadImage: async (file: File): Promise<{ url: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ url: reader.result as string });
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
     });
-    return res.data;
   },
 };
