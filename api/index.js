@@ -54,7 +54,7 @@ const adminSchema = new mongoose.Schema({
 const Story = mongoose.models.Story || mongoose.model('Story', storySchema);
 const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
 
-// In-Memory Seed Fallback Stories
+// In-Memory Dual Fail-Safe Story Store
 const memoryStories = [
   {
     _id: '1',
@@ -91,6 +91,16 @@ const memoryStories = [
     updatedAt: new Date()
   }
 ];
+
+// Slug Generator Helper
+function generateSlug(text) {
+  return String(text || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || `story-${Date.now()}`;
+}
 
 // Admin Auth Middleware
 const authMiddleware = (req, res, next) => {
@@ -140,7 +150,8 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
       console.error('DB fetch error:', err.message);
     }
   }
-  return res.json({ stories: memoryStories });
+  const publicMemStories = memoryStories.filter(s => s.status === 'PUBLIC');
+  return res.json({ stories: publicMemStories });
 });
 
 // --- SINGLE STORY DETAIL ---
@@ -207,7 +218,7 @@ app.get(['/api/admin/me', '/admin/me'], authMiddleware, (req, res) => {
   });
 });
 
-// --- ADMIN STORIES ---
+// --- GET ALL ADMIN STORIES ---
 app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
   const dbOk = await connectDB();
   if (dbOk) {
@@ -221,7 +232,7 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
           { excerpt: { $regex: search, $options: 'i' } }
         ];
       }
-      const stories = await Story.find(query).sort({ updatedAt: -1 });
+      const stories = await Story.find(query).sort({ updatedAt: -1, createdAt: -1 });
       const total = await Story.countDocuments();
       const published = await Story.countDocuments({ status: 'PUBLIC' });
       const drafts = await Story.countDocuments({ status: 'DRAFT' });
@@ -233,6 +244,149 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
     }
   }
   return res.json({ stories: memoryStories, stats: { total: memoryStories.length, published: memoryStories.length, drafts: 0, private: 0 } });
+});
+
+// --- CREATE NEW STORY (POST) ---
+app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, res) => {
+  const { title, content, excerpt, featuredImage, language, fontFamily, category, tags, status } = req.body || {};
+  if (!title) return res.status(400).json({ error: 'Title is required.' });
+
+  const slug = generateSlug(title);
+  const wordCount = (content || '').replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
+  const storyData = {
+    title,
+    slug,
+    excerpt: excerpt || (content || '').replace(/<[^>]*>/g, '').slice(0, 150) + '...',
+    content: content || '',
+    featuredImage: featuredImage || '',
+    language: language || 'en',
+    fontFamily: fontFamily || 'georgia',
+    category: category || 'General',
+    tags: Array.isArray(tags) ? tags : (tags ? String(tags).split(',').map(t => t.trim()) : []),
+    status: status || 'DRAFT',
+    readingTime,
+    publishedAt: status === 'PUBLIC' ? new Date() : null,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  const dbOk = await connectDB();
+  if (dbOk) {
+    try {
+      const created = await Story.create(storyData);
+      return res.json({ story: created });
+    } catch (err) {
+      console.error('DB create story error:', err.message);
+    }
+  }
+
+  // Dual Fallback: Save to Memory Array
+  storyData._id = `mem_${Date.now()}`;
+  memoryStories.unshift(storyData);
+  return res.json({ story: storyData });
+});
+
+// --- GET SINGLE ADMIN STORY BY ID ---
+app.get(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const dbOk = await connectDB();
+  if (dbOk) {
+    try {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        const story = await Story.findById(id);
+        if (story) return res.json({ story });
+      }
+    } catch (err) {
+      console.error('DB get story by id error:', err.message);
+    }
+  }
+  const found = memoryStories.find(s => s._id === id || s.slug === id);
+  if (found) return res.json({ story: found });
+  return res.status(404).json({ error: 'Story not found.' });
+});
+
+// --- UPDATE STORY (PUT) ---
+app.put(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body || {};
+  if (updates.title && !updates.slug) {
+    updates.slug = generateSlug(updates.title);
+  }
+  if (updates.status === 'PUBLIC' && !updates.publishedAt) {
+    updates.publishedAt = new Date();
+  }
+  updates.updatedAt = new Date();
+
+  const dbOk = await connectDB();
+  if (dbOk) {
+    try {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        const updated = await Story.findByIdAndUpdate(id, updates, { new: true });
+        if (updated) return res.json({ story: updated });
+      }
+    } catch (err) {
+      console.error('DB update story error:', err.message);
+    }
+  }
+
+  const idx = memoryStories.findIndex(s => s._id === id);
+  if (idx !== -1) {
+    memoryStories[idx] = { ...memoryStories[idx], ...updates };
+    return res.json({ story: memoryStories[idx] });
+  }
+  return res.status(404).json({ error: 'Story not found.' });
+});
+
+// --- DELETE STORY (DELETE) ---
+app.delete(['/api/admin/stories/:id', '/admin/stories/:id'], authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const dbOk = await connectDB();
+  if (dbOk) {
+    try {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        await Story.findByIdAndDelete(id);
+        return res.json({ success: true, id });
+      }
+    } catch (err) {
+      console.error('DB delete story error:', err.message);
+    }
+  }
+
+  const idx = memoryStories.findIndex(s => s._id === id);
+  if (idx !== -1) {
+    memoryStories.splice(idx, 1);
+    return res.json({ success: true, id });
+  }
+  return res.json({ success: true, id });
+});
+
+// --- TOGGLE STORY STATUS (PATCH) ---
+app.patch(['/api/admin/stories/:id/status', '/admin/stories/:id/status'], authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body || {};
+  const updates = { status, updatedAt: new Date() };
+  if (status === 'PUBLIC') updates.publishedAt = new Date();
+
+  const dbOk = await connectDB();
+  if (dbOk) {
+    try {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        const updated = await Story.findByIdAndUpdate(id, updates, { new: true });
+        if (updated) return res.json({ story: updated });
+      }
+    } catch (err) {
+      console.error('DB patch status error:', err.message);
+    }
+  }
+
+  const idx = memoryStories.findIndex(s => s._id === id);
+  if (idx !== -1) {
+    memoryStories[idx] = { ...memoryStories[idx], ...updates };
+    return res.json({ story: memoryStories[idx] });
+  }
+  return res.status(404).json({ error: 'Story not found.' });
 });
 
 // Catch-all route for any unhandled API endpoints
