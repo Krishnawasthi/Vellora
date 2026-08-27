@@ -82,7 +82,7 @@ npm run dev
 ```
 
 Visit the application at:
-- **Public Reader View**: `http://localhost:3000`
+- **Public Reader View**: https://vellora-teal.vercel.app/
 - **Owner Admin Login**: `http://localhost:3000/admin/login`
 
 ---
