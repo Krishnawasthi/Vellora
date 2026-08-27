@@ -17,14 +17,30 @@ const JWT_SECRET = process.env.JWT_SECRET || 'vellora_secret_key_2026';
 
 let isConnected = false;
 async function connectDB() {
-  if (isConnected && mongoose.connection.readyState === 1) return;
+  if (isConnected && mongoose.connection.readyState === 1) return true;
   try {
-    await mongoose.connect(MONGODB_URI);
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000
+    });
     isConnected = true;
+    return true;
   } catch (err) {
     console.error('MongoDB connection error:', err);
+    return false;
   }
 }
+
+// Middleware to ensure DB connection before processing requests
+app.use(async (req, res, next) => {
+  if (req.path === '/api/health') return next();
+  const connected = await connectDB();
+  if (!connected && mongoose.connection.readyState !== 1) {
+    return res.status(500).json({
+      error: 'Database connection failed. Please check MONGODB_URI and ensure MongoDB Atlas allows connections from anywhere (0.0.0.0/0).'
+    });
+  }
+  next();
+});
 
 // Schemas
 const storySchema = new mongoose.Schema({
@@ -70,12 +86,11 @@ const authMiddleware = (req, res, next) => {
 
 // --- PUBLIC ROUTES ---
 app.get('/api/health', async (req, res) => {
-  await connectDB();
-  res.json({ status: 'OK', name: 'Vellora Vercel API', time: new Date().toISOString() });
+  const dbState = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+  res.json({ status: 'OK', name: 'Vellora Vercel API', dbState, time: new Date().toISOString() });
 });
 
 app.get('/api/stories', async (req, res) => {
-  await connectDB();
   try {
     const { category, search, language } = req.query;
     const query = { status: 'PUBLIC' };
@@ -95,7 +110,6 @@ app.get('/api/stories', async (req, res) => {
 });
 
 app.get('/api/stories/:slug', async (req, res) => {
-  await connectDB();
   try {
     const story = await Story.findOne({ slug: req.params.slug, status: 'PUBLIC' });
     if (!story) return res.status(404).json({ error: 'Story not found.' });
@@ -107,7 +121,6 @@ app.get('/api/stories/:slug', async (req, res) => {
 
 // --- ADMIN ROUTES ---
 app.post('/api/admin/login', async (req, res) => {
-  await connectDB();
   try {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
@@ -126,12 +139,11 @@ app.post('/api/admin/login', async (req, res) => {
     const token = jwt.sign({ id: admin._id, username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, admin: { id: admin._id, username: admin.username, name: admin.name } });
   } catch (err) {
-    res.status(500).json({ error: 'Login failed.' });
+    res.status(500).json({ error: err.message || 'Login failed.' });
   }
 });
 
 app.get('/api/admin/stories', authMiddleware, async (req, res) => {
-  await connectDB();
   try {
     const { status, search } = req.query;
     const query = {};
@@ -155,7 +167,6 @@ app.get('/api/admin/stories', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/admin/stories/:id', authMiddleware, async (req, res) => {
-  await connectDB();
   try {
     const story = await Story.findById(req.params.id);
     if (!story) return res.status(404).json({ error: 'Story not found.' });
@@ -166,7 +177,6 @@ app.get('/api/admin/stories/:id', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/admin/stories', authMiddleware, async (req, res) => {
-  await connectDB();
   try {
     const data = req.body;
     let baseSlug = (data.title || 'untitled-story').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'story';
@@ -185,7 +195,6 @@ app.post('/api/admin/stories', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/admin/stories/:id', authMiddleware, async (req, res) => {
-  await connectDB();
   try {
     const data = req.body;
     if (data.status === 'PUBLIC') {
@@ -200,7 +209,6 @@ app.put('/api/admin/stories/:id', authMiddleware, async (req, res) => {
 });
 
 app.delete('/api/admin/stories/:id', authMiddleware, async (req, res) => {
-  await connectDB();
   try {
     await Story.findByIdAndDelete(req.params.id);
     res.json({ message: 'Story deleted successfully.' });
@@ -210,7 +218,6 @@ app.delete('/api/admin/stories/:id', authMiddleware, async (req, res) => {
 });
 
 app.patch('/api/admin/stories/:id/status', authMiddleware, async (req, res) => {
-  await connectDB();
   try {
     const { status } = req.body;
     const updateData = { status };
