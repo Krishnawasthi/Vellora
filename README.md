@@ -4,7 +4,6 @@
 > *A quiet, warm corner of the internet for stories, thoughts, memories, and moments worth keeping.*
 
 ---
-
 ## ☕ About Vellora
 
 **Vellora** is a personal digital journal and publishing space built for writers who value quiet attention over algorithmic feeds, likes, or metric counters. 
