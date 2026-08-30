@@ -42,6 +42,7 @@ export const App: React.FC = () => {
               <Route path="/" element={<HomePage />} />
               <Route path="/stories" element={<StoryListPage />} />
               <Route path="/story/:slug" element={<StoryDetailPage />} />
+              <Route path="/stories/:slug" element={<StoryDetailPage />} />
               <Route path="/about" element={<AboutPage />} />
 
               {/* Admin Auth Route */}

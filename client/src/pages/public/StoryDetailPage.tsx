@@ -17,11 +17,12 @@ export const StoryDetailPage: React.FC = () => {
     const fetchStory = async () => {
       if (!slug) return;
       setLoading(true);
+      setStory(null);
       setError(null);
       try {
         const data = await PublicService.getStoryBySlug(slug);
         setStory(data);
-        if (data.title) {
+        if (data && data.title) {
           document.title = `${data.title} — Vellora`;
         }
       } catch (err: any) {
@@ -32,6 +33,7 @@ export const StoryDetailPage: React.FC = () => {
     };
 
     fetchStory();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [slug]);
 
   const handleShare = () => {

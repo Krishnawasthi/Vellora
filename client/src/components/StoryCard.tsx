@@ -16,12 +16,14 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, featured = false })
     mixed: 'English & हिंदी',
   }[story.language] || 'English';
 
+  const storyPath = `/story/${story.slug || story._id}`;
+
   if (featured) {
     return (
       <article className="group relative rounded-xl overflow-hidden bg-cream-100/90 dark:bg-chocolate-900/70 border border-cream-300 dark:border-chocolate-800 transition-all duration-300 hover:shadow-md grid grid-cols-1 md:grid-cols-12 gap-0 mb-4 max-w-4xl mx-auto md:h-40">
         {/* Ultra-compact image thumbnail */}
         <div className="md:col-span-4 relative h-36 md:h-full overflow-hidden bg-cream-200 dark:bg-chocolate-800">
-          <Link to={`/story/${story.slug}`} className="block w-full h-full">
+          <Link to={storyPath} className="block w-full h-full">
             {story.featuredImage ? (
               <img
                 src={story.featuredImage}
@@ -61,7 +63,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, featured = false })
             </div>
 
             <h2 className="font-serif text-base font-bold text-chocolate-950 dark:text-cream-50 hover:text-chocolate-700 dark:hover:text-amber-200 transition-colors leading-snug mb-1 line-clamp-1">
-              <Link to={`/story/${story.slug}`}>
+              <Link to={storyPath}>
                 {story.title}
               </Link>
             </h2>
@@ -73,7 +75,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, featured = false })
 
           <div className="mt-2 pt-2 border-t border-cream-300/80 dark:border-chocolate-800 flex items-center justify-between">
             <Link
-              to={`/story/${story.slug}`}
+              to={storyPath}
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-chocolate-900 text-cream-50 dark:bg-cream-100 dark:text-chocolate-950 font-bold text-[11px] hover:scale-105 transition-all shadow-xs"
             >
               Read Story →
@@ -97,7 +99,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, featured = false })
     <article className="group relative flex flex-col rounded-xl overflow-hidden bg-cream-100/90 dark:bg-chocolate-900/60 border border-cream-300 dark:border-chocolate-800 hover:border-chocolate-400 dark:hover:border-chocolate-600 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm">
       {/* Compact Featured Image */}
       <div className="relative aspect-[16/8] overflow-hidden bg-cream-200 dark:bg-chocolate-800">
-        <Link to={`/story/${story.slug}`} className="block w-full h-full">
+        <Link to={storyPath} className="block w-full h-full">
           {story.featuredImage ? (
             <img
               src={story.featuredImage}
@@ -131,7 +133,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, featured = false })
           </div>
 
           <h3 className="font-serif text-xs font-bold text-chocolate-950 dark:text-cream-50 hover:text-chocolate-700 dark:hover:text-amber-200 transition-colors leading-snug mb-0.5 line-clamp-1">
-            <Link to={`/story/${story.slug}`}>
+            <Link to={storyPath}>
               {story.title}
             </Link>
           </h3>
@@ -143,7 +145,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, featured = false })
 
         <div className="mt-2 pt-1.5 border-t border-cream-300/60 dark:border-chocolate-800 flex items-center justify-between">
           <Link
-            to={`/story/${story.slug}`}
+            to={storyPath}
             className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-chocolate-900 text-cream-50 dark:bg-cream-100 dark:text-chocolate-950 font-bold text-[10px] hover:scale-105 transition-all shadow-xs"
           >
             Read Story →
