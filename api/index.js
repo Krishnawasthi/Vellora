@@ -133,14 +133,14 @@ app.all(['/', '/api/health', '/health'], async (req, res) => {
   });
 });
 
-// --- PUBLIC STORIES ---
+// --- PUBLIC STORIES (PUBLIC STATUS ONLY) ---
 app.get(['/api/stories', '/stories'], async (req, res) => {
   const dbOk = await connectDB();
   if (dbOk) {
     try {
       const { category, search, language } = req.query;
       const query = { 
-        status: { $ne: 'PRIVATE' },
+        status: 'PUBLIC',
         slug: { $nin: DEFAULT_SEED_SLUGS }
       };
       if (category && category !== 'All') query.category = category;
@@ -157,11 +157,11 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
       console.error('DB fetch error:', err.message);
     }
   }
-  const filteredMem = memoryStories.filter(s => s.status !== 'PRIVATE' && !DEFAULT_SEED_SLUGS.includes(s.slug));
+  const filteredMem = memoryStories.filter(s => s.status === 'PUBLIC' && !DEFAULT_SEED_SLUGS.includes(s.slug));
   return res.json({ stories: filteredMem });
 });
 
-// --- SINGLE STORY DETAIL (STRICT BY SLUG OR OBJECTID) ---
+// --- SINGLE STORY DETAIL (STRICT BY SLUG OR OBJECTID & PUBLIC STATUS ONLY) ---
 app.get(['/api/stories/:slug', '/stories/:slug'], async (req, res) => {
   const { slug } = req.params;
   const decodedSlug = decodeURIComponent(slug);
@@ -171,6 +171,7 @@ app.get(['/api/stories/:slug', '/stories/:slug'], async (req, res) => {
   if (dbOk) {
     try {
       const query = {
+        status: 'PUBLIC',
         $or: [
           { slug: slug },
           { slug: decodedSlug },
@@ -184,7 +185,7 @@ app.get(['/api/stories/:slug', '/stories/:slug'], async (req, res) => {
       console.error('DB findOne error:', err.message);
     }
   }
-  const found = memoryStories.find(s => s.slug === slug || s.slug === decodedSlug || (isObjectId && String(s._id) === slug));
+  const found = memoryStories.find(s => s.status === 'PUBLIC' && (s.slug === slug || s.slug === decodedSlug || (isObjectId && String(s._id) === slug)));
   if (found) return res.json(found);
   return res.status(404).json({ error: 'Story not found.' });
 });
@@ -253,7 +254,7 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
       }
       const stories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1 });
       const total = await Story.countDocuments({ slug: { $nin: DEFAULT_SEED_SLUGS } });
-      const published = await Story.countDocuments({ status: { $ne: 'PRIVATE' }, slug: { $nin: DEFAULT_SEED_SLUGS } });
+      const published = await Story.countDocuments({ status: 'PUBLIC', slug: { $nin: DEFAULT_SEED_SLUGS } });
       const drafts = await Story.countDocuments({ status: 'DRAFT', slug: { $nin: DEFAULT_SEED_SLUGS } });
       const privateCount = await Story.countDocuments({ status: 'PRIVATE', slug: { $nin: DEFAULT_SEED_SLUGS } });
       
@@ -267,7 +268,7 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
     stories: filteredMem, 
     stats: { 
       total: filteredMem.length, 
-      published: filteredMem.filter(s => s.status !== 'PRIVATE').length, 
+      published: filteredMem.filter(s => s.status === 'PUBLIC').length, 
       drafts: filteredMem.filter(s => s.status === 'DRAFT').length, 
       private: filteredMem.filter(s => s.status === 'PRIVATE').length 
     } 
