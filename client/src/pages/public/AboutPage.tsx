@@ -11,9 +11,6 @@ export const AboutPage: React.FC = () => {
         <div className="flex justify-center">
           <Logo size="lg" />
         </div>
-        <h1 className="font-serif text-3xl sm:text-5xl font-bold text-chocolate-950 dark:text-cream-50">
-          About Vellora
-        </h1>
         <p className="font-noto-serif-devanagari font-serif text-lg sm:text-xl text-chocolate-800 dark:text-cream-200 italic max-w-xl mx-auto">
           “यहाँ मैं अपने विचार, कहानियाँ और अनुभव साझा करता हूँ”
         </p>
