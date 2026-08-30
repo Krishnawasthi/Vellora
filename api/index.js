@@ -13,15 +13,32 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://kmawasthi77_db_user:uk3iz5Tf2uA4rQcH@cluster0.d67klqp.mongodb.net/vellora?retryWrites=true&w=majority';
 const JWT_SECRET = process.env.JWT_SECRET || 'vellora_secret_key_2026';
 
+// List of default seed slugs that must be permanently excluded & removed
+const DEFAULT_SEED_SLUGS = [
+  'the-solitude-of-rainy-afternoons',
+  'purani-kitabon-ki-mahak',
+  'art-of-noticing-quiet-morning-hours',
+  'purane-seher-ki-galiyan-chai',
+  'weekend-drive-nandi-hills-hinglish',
+  'notes-on-digital-solitude-draft',
+  'private-journal-personal-milestones-2026'
+];
+
 let isConnected = false;
+let cleanedDefaults = false;
+
 async function connectDB() {
-  if (isConnected && mongoose.connection.readyState === 1) return true;
+  if (isConnected && mongoose.connection.readyState === 1) {
+    if (!cleanedDefaults) await cleanDefaultSeedStories();
+    return true;
+  }
   try {
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
       connectTimeoutMS: 10000
     });
     isConnected = true;
+    await cleanDefaultSeedStories();
     return true;
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
@@ -55,43 +72,25 @@ const adminSchema = new mongoose.Schema({
 const Story = mongoose.models.Story || mongoose.model('Story', storySchema);
 const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
 
-// In-Memory Dual Fail-Safe Story Store
-const memoryStories = [
-  {
-    _id: '1',
-    title: 'The Solitude of Rainy Afternoons',
-    slug: 'the-solitude-of-rainy-afternoons',
-    excerpt: 'There is a quiet rhythm to rainfall against windowpanes that invites reflection...',
-    content: '<p>There is a quiet rhythm to rainfall against windowpanes that invites reflection and stillness in a noisy world.</p>',
-    featuredImage: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=1200&q=80',
-    language: 'en',
-    fontFamily: 'georgia',
-    category: 'Reflections',
-    tags: ['rain', 'solitude', 'life'],
-    status: 'PUBLIC',
-    readingTime: 3,
-    publishedAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  {
-    _id: '2',
-    title: 'पुरानी किताबों की महक',
-    slug: 'purani-kitabon-ki-mahak',
-    excerpt: 'कागज़ की सुगंध में बीते हुए ज़माने की यादें छुपी होती हैं...',
-    content: '<p>कागज़ की सुगंध में बीते हुए ज़माने की यादें छुपी होती हैं, जो हमें अतीत की पगडंडियों पर ले जाती हैं।</p>',
-    featuredImage: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=1200&q=80',
-    language: 'hi',
-    fontFamily: 'rozha',
-    category: 'यादें',
-    tags: ['किताबें', 'हिंदी', 'अतीत'],
-    status: 'PUBLIC',
-    readingTime: 4,
-    publishedAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date()
+// Safe cleanup of only default seed stories from MongoDB Atlas
+async function cleanDefaultSeedStories() {
+  if (cleanedDefaults) return;
+  try {
+    await Story.deleteMany({
+      $or: [
+        { slug: { $in: DEFAULT_SEED_SLUGS } },
+        { title: { $in: ['The Solitude of Rainy Afternoons', 'पुरानी किताबों की महक'] } }
+      ]
+    });
+    cleanedDefaults = true;
+    console.log('Cleaned default seed stories from MongoDB Atlas.');
+  } catch (err) {
+    console.warn('Cleanup check warning:', err.message);
   }
-];
+}
+
+// In-Memory Story Store (Empty by default - only holds user-created stories)
+const memoryStories = [];
 
 // Slug Generator Helper
 function generateSlug(text) {
@@ -136,7 +135,10 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
   if (dbOk) {
     try {
       const { category, search, language } = req.query;
-      const query = { status: { $ne: 'PRIVATE' } };
+      const query = { 
+        status: { $ne: 'PRIVATE' },
+        slug: { $nin: DEFAULT_SEED_SLUGS }
+      };
       if (category && category !== 'All') query.category = category;
       if (language && language !== 'all') query.language = language;
       if (search) {
@@ -151,7 +153,8 @@ app.get(['/api/stories', '/stories'], async (req, res) => {
       console.error('DB fetch error:', err.message);
     }
   }
-  return res.json({ stories: memoryStories });
+  const filteredMem = memoryStories.filter(s => s.status !== 'PRIVATE' && !DEFAULT_SEED_SLUGS.includes(s.slug));
+  return res.json({ stories: filteredMem });
 });
 
 // --- SINGLE STORY DETAIL ---
@@ -224,7 +227,7 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
   if (dbOk) {
     try {
       const { status, search } = req.query;
-      const query = {};
+      const query = { slug: { $nin: DEFAULT_SEED_SLUGS } };
       if (status && status !== 'ALL') query.status = status;
       if (search) {
         query.$or = [
@@ -233,17 +236,26 @@ app.get(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, re
         ];
       }
       const stories = await Story.find(query).sort({ createdAt: -1, updatedAt: -1 });
-      const total = await Story.countDocuments();
-      const published = await Story.countDocuments({ status: { $ne: 'PRIVATE' } });
-      const drafts = await Story.countDocuments({ status: 'DRAFT' });
-      const privateCount = await Story.countDocuments({ status: 'PRIVATE' });
+      const total = await Story.countDocuments({ slug: { $nin: DEFAULT_SEED_SLUGS } });
+      const published = await Story.countDocuments({ status: { $ne: 'PRIVATE' }, slug: { $nin: DEFAULT_SEED_SLUGS } });
+      const drafts = await Story.countDocuments({ status: 'DRAFT', slug: { $nin: DEFAULT_SEED_SLUGS } });
+      const privateCount = await Story.countDocuments({ status: 'PRIVATE', slug: { $nin: DEFAULT_SEED_SLUGS } });
       
       return res.json({ stories, stats: { total, published, drafts, private: privateCount } });
     } catch (err) {
       console.error('Admin stories error:', err.message);
     }
   }
-  return res.json({ stories: memoryStories, stats: { total: memoryStories.length, published: memoryStories.length, drafts: 0, private: 0 } });
+  const filteredMem = memoryStories.filter(s => !DEFAULT_SEED_SLUGS.includes(s.slug));
+  return res.json({ 
+    stories: filteredMem, 
+    stats: { 
+      total: filteredMem.length, 
+      published: filteredMem.filter(s => s.status !== 'PRIVATE').length, 
+      drafts: filteredMem.filter(s => s.status === 'DRAFT').length, 
+      private: filteredMem.filter(s => s.status === 'PRIVATE').length 
+    } 
+  });
 });
 
 // --- CREATE NEW STORY (POST) ---
@@ -277,7 +289,6 @@ app.post(['/api/admin/stories', '/admin/stories'], authMiddleware, async (req, r
   if (dbOk) {
     try {
       const created = await Story.create(storyData);
-      // Synchronize into memory stories as well
       memoryStories.unshift(created.toObject ? created.toObject() : created);
       return res.json({ story: created });
     } catch (err) {
