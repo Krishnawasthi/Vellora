@@ -10,7 +10,7 @@ app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://kmawasthi77_db_user:uk3iz5Tf2uA4rQcH@cluster0.d67klqp.mongodb.net/vellora?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || 'vellora_secret_key_2026';
 
 // List of default seed slugs that must be permanently excluded & removed
